@@ -10,12 +10,12 @@
 #include <unistd.h>
 #include <elf.h>
 
-#ifndef TERMUX_BASE_DIR
-# define TERMUX_BASE_DIR "/data/data/com.termux/files"
+#ifndef BASE_DIR
+# define BASE_DIR "/data/data/com.termux/files"
 #endif
 
-#ifndef TERMUX_PREFIX
-# define TERMUX_PREFIX "/data/data/com.termux/files/usr"
+#ifndef PREFIX
+# define PREFIX "/system"
 #endif
 
 #ifdef __aarch64__
@@ -32,18 +32,18 @@
 
 #define starts_with(value, str) !strncmp(value, str, sizeof(str) - 1)
 
-static const char* termux_rewrite_executable(const char* filename, char* buffer, int buffer_len)
+static const char* android_rewrite_executable(const char* filename, char* buffer, int buffer_len)
 {
-	if (starts_with(filename, TERMUX_BASE_DIR) ||
+	if (starts_with(filename, BASE_DIR) ||
 			starts_with(filename, "/system/"))
 		return filename;
 
-	strcpy(buffer, TERMUX_PREFIX "/bin/");
+	strcpy(buffer, PREFIX "/bin/");
 	char* bin_match = strstr(filename, "/bin/");
 	if (bin_match == filename || bin_match == (filename + 4)) {
 		// We have either found "/bin/" at the start of the string or at
 		// "/xxx/bin/". Take the path after that.
-		strncpy(buffer + sizeof(TERMUX_PREFIX "/bin/") - 1, bin_match + 5, buffer_len - sizeof(TERMUX_PREFIX "/bin/"));
+		strncpy(buffer + sizeof(PREFIX "/bin/") - 1, bin_match + 5, buffer_len - sizeof(PREFIX "/bin/"));
 		filename = buffer;
 	}
 	return filename;
@@ -74,7 +74,7 @@ static char*const * remove_ld_preload(char*const * envp)
 
 int execve(const char* filename, char* const* argv, char* const* envp)
 {
-	bool android_10_debug = getenv("TERMUX_ANDROID10_DEBUG") != NULL;
+	bool android_10_debug = getenv("ANDROID10_DEBUG") != NULL;
 	if (android_10_debug) {
 		printf("execve(%s):\n", filename);
 		int tmp_argv_count = 0;
@@ -89,7 +89,7 @@ int execve(const char* filename, char* const* argv, char* const* envp)
 	const char** new_envp = NULL;
 
 	char filename_buffer[512];
-	filename = termux_rewrite_executable(filename, filename_buffer, sizeof(filename_buffer));
+	filename = android_rewrite_executable(filename, filename_buffer, sizeof(filename_buffer));
 
 	// Error out if the file is not executable:
 	if (access(filename, X_OK) != 0) goto final;
@@ -170,7 +170,7 @@ int execve(const char* filename, char* const* argv, char* const* envp)
 	}
 
 	char interp_buf[512];
-	const char* new_interpreter = termux_rewrite_executable(interpreter, interp_buf, sizeof(interp_buf));
+	const char* new_interpreter = android_rewrite_executable(interpreter, interp_buf, sizeof(interp_buf));
 	if (new_interpreter == interpreter) goto final;
 
 	int orig_argv_count = 0;
@@ -193,12 +193,12 @@ final:
 	if (fd != -1) close(fd);
 	int (*real_execve)(const char*, char* const[], char* const[]) = dlsym(RTLD_NEXT, "execve");
 
-	bool android_10_wrapping = getenv("TERMUX_ANDROID10") != NULL;
+	bool android_10_wrapping = getenv("ANDROID10") != NULL;
 	if (android_10_wrapping) {
 		char realpath_buffer[PATH_MAX];
 		bool realpath_ok = realpath(filename, realpath_buffer) != NULL;
 		if (realpath_ok) {
-			bool wrap_in_proot = (strstr(realpath_buffer, TERMUX_BASE_DIR) != NULL);
+			bool wrap_in_proot = (strstr(realpath_buffer, BASE_DIR) != NULL);
 			if (android_10_debug) {
 				printf("termux-exec: realpath(\"%s\") = \"%s\", wrapping=%s\n", filename, realpath_buffer, wrap_in_proot ? "yes" : "no");
 			}
@@ -207,7 +207,7 @@ final:
 				while (argv[orig_argv_count] != NULL) orig_argv_count++;
 
 				new_argv = malloc(sizeof(char*) * (2 + orig_argv_count));
-				filename = TERMUX_PREFIX "/bin/proot";
+				filename = PREFIX "/bin/proot";
 				new_argv[0] = "proot";
 				for (int i = 0; i < orig_argv_count; i++) {
 					new_argv[i + 1] = argv[i];

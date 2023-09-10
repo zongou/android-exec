@@ -1,7 +1,9 @@
-# termux-exec
+# android-exec
+
 A `execve()` wrapper to fix problem with shebangs when running in Termux.
 
-# Problem
+## Problem
+
 A lot of Linux software is written with the assumption that `/bin/sh`, `/usr/bin/env`
 and similar file exists. This is not the case on Android where neither `/bin/` nor `/usr/`
 exists.
@@ -9,16 +11,25 @@ exists.
 When building packages for Termux those hard-coded assumptions are patched away - but this
 does not help with installing scripts and programs from other sources than Termux packages.
 
-# Solution
+## Solution
+
 Create an `execve()` wrapper that rewrites calls to execute files under `/bin/` and `/usr/bin`
 into the matching Termux executables under `$PREFIX/bin/` and inject that into processes
 using `LD_PRELOAD`.
 
-# How to install
-1. Install with `pkg install termux-exec`.
+## How to install on termux
+
+1. Install with `pkg install android-exec`.
 2. Exit your current session and start a new one.
 3. From now on shebangs such as `/bin/sh` and `/usr/bin/env python` should work.
 
-# Where is LD_PRELOAD set?
+## Where is LD_PRELOAD set on termux?
+
 The `$PREFIX/bin/login` program which is used to create new Termux sessions checks for
-`$PREFIX/lib/libtermux-exec.so` and if so sets up `LD_PRELOAD` before launching the login shell.
+`$PREFIX/lib/libandroid-exec.so` and if so sets up `LD_PRELOAD` before launching the login shell.
+
+## compile with android NDK
+
+```sh
+CC=/path/to/android/ndk/toolchain/clang make -B
+```
